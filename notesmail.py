@@ -2,6 +2,8 @@ import datetime
 from win32com.client import DispatchEx
 from win32com.client import makepy
 
+from extract import Extract
+
 makepy.GenerateFromTypeLibSpec('Lotus Domino Objects')
 makepy.GenerateFromTypeLibSpec('Lotus Notes Automation Classes')
 
@@ -10,11 +12,11 @@ class NotesMail():
      发送读取邮件有关的操作
     """
     def __init__(self, server, file):
-        """初始化连接
+        """Initialize
             @param server
-             服务器名
+             Server's name of Notes
             @param file
-             数据文件名
+             Your data file, usually ends with '.nsf'
         """
         self.session = DispatchEx('Notes.NotesSession')
         self.server = self.session.GetEnvironmentString("MailServer", True)
@@ -39,46 +41,44 @@ class NotesMail():
         for view in self.db.Views:
             if view.IsFolder:
                 self.myviews.append(view.name)
-    def make_document_generator(self, view_name):
-        self.__get_folder()
+
+    def get_documents(self, view_name):
+        """
+            @return generator
+        """
+        documents = []
         folder = self.db.GetView(view_name)
         if not folder:
             raise Exception('Folder {0} not found. '.format(view_name))
         document = folder.GetFirstDocument
         while document:
-            yield document
+            documents.append(document)
             document = folder.GetNextDocument(document)
 
-    def read_mail(self):
-        for document in self.make_document_generator('Mine'):
-            result = self.extract_documet(document)
+        return documents
 
-        print(result)
-        """
-        self.d
-        dirc = self.session.GetDbDirectory("Domino/罗皓")
-        d = self.db.OpenMailDatabase
-        view = d.GetView("$inbox")
-        doc = view.getfirstdocument()
-        """
-    def extract_documet(self, document):
-        """提取Document
+    def read_mail(self, view, attachment=False):
+        """Read the latest mail
+            @param view
+             The view(fold) to access
+            @param attachment
+             Boolean, whether get attachment
+            @return, dict
+             Info of a mail
         """
         result = {}
-        result['subject'] = document.GetItemValue('Subject')[0].strip()
-        result['date'] = document.GetItemValue('PostedDate')[0]
-        result['From'] = document.GetItemValue('From')[0].strip()
-        result['To'] = document.GetItemValue('SendTo')
-        result['body'] = document.GetItemValue('Body')[0].strip()
+
+        documents = self.get_documents(view)
+        latest_document = documents[-1:][0]
+        extra_obj = Extract(latest_document)
+        result = extra_obj.extract()
+        if attachment:
+            extra_obj.get_attachment()
 
         return result
 
 def main():
-    mail = NotesMail("ZH45XXSS05/BOC", 'mail\lh7167.nsf')
-    #mail = NotesMail('C:\\Program Files (x86)\\IBM\\Lotus\\Notes\\Data\\as_罗皓.nsf')
-    #mail.read_mail()
-    mail.send_mail('603750199@qq.com', 'Good afternoon', 'Wish you a good day')
-
+    pass
 if __name__ == '__main__':
     main()
 
